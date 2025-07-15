@@ -28,7 +28,7 @@ const ENTRIES_KEY = "smart_id_entries"
 
 class DatabaseStore {
   private isSupabaseAvailable(): boolean {
-    return supabase !== null && typeof window !== "undefined"
+    return false // Force use API routes for deployment
   }
 
   private isLocalStorageAvailable(): boolean {
@@ -104,14 +104,22 @@ class DatabaseStore {
   }
 
   async getStudents(): Promise<StudentWithDates[]> {
-    const res = await fetch("/api/students");
-    if (!res.ok) throw new Error("Failed to fetch students");
-    const data = await res.json();
-    return data.map((s: any) => ({
-      ...s,
-      createdAt: new Date(s.createdAt),
-      updatedAt: new Date(s.updatedAt),
-    }));
+    try {
+      const res = await fetch("/api/students");
+      if (!res.ok) {
+        console.warn("⚠️ Students API not available, using localStorage fallback");
+        return this.loadStudentsFromLocal();
+      }
+      const data = await res.json();
+      return data.map((s: any) => ({
+        ...s,
+        createdAt: new Date(s.createdAt),
+        updatedAt: new Date(s.updatedAt),
+      }));
+    } catch (error) {
+      console.warn("⚠️ Students API error, using localStorage fallback:", error);
+      return this.loadStudentsFromLocal();
+    }
   }
 
   async getStudentByAppNumber(appNumber: string): Promise<StudentWithDates | null> {
@@ -142,28 +150,57 @@ class DatabaseStore {
   }
 
   async updateStudent(id: string, updates: StudentUpdate): Promise<StudentWithDates | null> {
-    const res = await fetch("/api/students", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...updates }),
-    });
-    if (!res.ok) throw new Error("Failed to update student");
-    const data = await res.json();
-    return {
-      ...data,
-      createdAt: new Date(data.createdAt),
-      updatedAt: new Date(data.updatedAt),
-    };
+    try {
+      console.log("📝 Updating student:", id, "with updates:", updates)
+
+      const res = await fetch("/api/students", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...updates }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        console.error("❌ Update student API error:", res.status, errorData)
+        throw new Error(`Failed to update student: ${res.status} - ${errorData.error || res.statusText}`)
+      }
+
+      const data = await res.json();
+      console.log("✅ Student updated successfully:", data.id)
+
+      return {
+        ...data,
+        createdAt: new Date(data.createdAt || data.created_at || Date.now()),
+        updatedAt: new Date(data.updatedAt || data.updated_at || Date.now()),
+      };
+    } catch (error) {
+      console.error("❌ Error in updateStudent:", error)
+      throw error
+    }
   }
 
   async deleteStudent(id: string): Promise<boolean> {
-    const res = await fetch("/api/students", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    if (!res.ok) throw new Error("Failed to delete student");
-    return true;
+    try {
+      console.log("🗑️ Deleting student with ID:", id)
+      const res = await fetch("/api/students", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error("❌ Delete API error:", res.status, errorData);
+        throw new Error(`Failed to delete student: ${errorData.error || res.statusText}`);
+      }
+
+      const result = await res.json();
+      console.log("✅ Student deleted successfully:", result);
+      return true;
+    } catch (error) {
+      console.error("❌ Error in deleteStudent:", error);
+      throw error;
+    }
   }
 
   // Entry Log Management
@@ -180,19 +217,18 @@ class DatabaseStore {
         .single()
 
       if (existingEntry) {
-        // Student is inside, mark exit
+        // Student is inside, update existing record with exit time
         const { data, error } = await supabase
           .from("entry_logs")
           .update({
             exit_time: new Date().toISOString(),
-            status: "exit",
           })
           .eq("id", existingEntry.id)
           .select()
           .single()
 
         if (error) {
-          console.error("Error updating entry:", error)
+          console.error("Error updating entry with exit time:", error)
           throw new Error("Failed to record exit")
         }
 
@@ -207,6 +243,7 @@ class DatabaseStore {
             student_name: studentName,
             status: "entry",
             verified: true,
+            entry_time: new Date().toISOString(),
           })
           .select()
           .single()
@@ -226,9 +263,8 @@ class DatabaseStore {
       const existingEntry = entries.find((e) => e.student_id === studentId && !e.exitTime)
 
       if (existingEntry) {
-        // Student is inside, mark exit
+        // Student is inside, update existing entry with exit time
         existingEntry.exitTime = new Date()
-        existingEntry.status = "exit"
         this.saveEntriesToLocal(entries)
         return existingEntry
       } else {
@@ -274,19 +310,40 @@ class DatabaseStore {
   }
 
   async getAllEntries(): Promise<EntryLogWithDates[]> {
-    if (this.isSupabaseAvailable() && supabase) {
-      // Use Supabase
-      const { data, error } = await supabase.from("entry_logs").select("*").order("entry_time", { ascending: false })
-
-      if (error) {
-        console.error("Error fetching entries:", error)
-        return []
+    try {
+      // Try API first
+      const res = await fetch('/api/entries');
+      if (res.ok) {
+        const data = await res.json();
+        console.log("✅ Entries loaded from API:", data.length);
+        return data.map((e: any) => ({
+          ...e,
+          entryTime: new Date(e.entry_time),
+          exitTime: e.exit_time ? new Date(e.exit_time) : undefined,
+          createdAt: new Date(e.created_at || e.entry_time),
+          updatedAt: new Date(e.updated_at || e.entry_time)
+        }));
+      } else {
+        console.warn("⚠️ Entries API not available, using fallback");
+        throw new Error("API failed");
       }
+    } catch (error) {
+      console.warn("⚠️ Entries API error, using fallback:", error);
 
-      return data.map(this.convertEntryLogDates)
-    } else {
-      // Use localStorage
-      return this.loadEntriesFromLocal()
+      if (this.isSupabaseAvailable() && supabase) {
+        // Use Supabase
+        const { data, error } = await supabase.from("entry_logs").select("*").order("entry_time", { ascending: false })
+
+        if (error) {
+          console.error("Error fetching entries:", error)
+          return this.loadEntriesFromLocal()
+        }
+
+        return data.map(this.convertEntryLogDates)
+      } else {
+        // Use localStorage
+        return this.loadEntriesFromLocal()
+      }
     }
   }
 
@@ -320,28 +377,28 @@ class DatabaseStore {
   }
 
   async getEntriesByDate(date: string): Promise<EntryLogWithDates[]> {
-    if (this.isSupabaseAvailable() && supabase) {
-      // Use Supabase
-      const startDate = new Date(date)
-      startDate.setHours(0, 0, 0, 0)
-      const endDate = new Date(date)
-      endDate.setHours(23, 59, 59, 999)
-
-      const { data, error } = await supabase
-        .from("entry_logs")
-        .select("*")
-        .gte("entry_time", startDate.toISOString())
-        .lte("entry_time", endDate.toISOString())
-        .order("entry_time", { ascending: false })
-
-      if (error) {
-        console.error("Error fetching entries by date:", error)
-        return []
+    try {
+      // Use API route which handles MongoDB
+      const res = await fetch(`/api/entries?date=${encodeURIComponent(date)}`);
+      if (!res.ok) {
+        console.warn("⚠️ Entries API not available, using localStorage fallback");
+        // Fallback to localStorage
+        const entries = this.loadEntriesFromLocal()
+        const targetDate = new Date(date).toDateString()
+        return entries.filter((e) => e.entryTime.toDateString() === targetDate)
       }
 
-      return data.map(this.convertEntryLogDates)
-    } else {
-      // Use localStorage
+      const data = await res.json();
+      return data.map((e: any) => ({
+        ...e,
+        entryTime: new Date(e.entry_time),
+        exitTime: e.exit_time ? new Date(e.exit_time) : undefined,
+        createdAt: new Date(e.created_at || e.entry_time),
+        updatedAt: new Date(e.updated_at || e.entry_time)
+      }));
+    } catch (error) {
+      console.error("Error fetching entries by date:", error);
+      // Fallback to localStorage
       const entries = this.loadEntriesFromLocal()
       const targetDate = new Date(date).toDateString()
       return entries.filter((e) => e.entryTime.toDateString() === targetDate)
@@ -415,26 +472,44 @@ class DatabaseStore {
   }
 
   async deleteAllStudentEntries(studentId: string): Promise<number> {
-    if (this.isSupabaseAvailable() && supabase) {
-      // Use Supabase
-      const { data, error } = await supabase
-        .from("entry_logs")
-        .delete()
-        .eq("student_id", studentId)
-        .select("id")
+    try {
+      // Try API first (MongoDB)
+      const res = await fetch(`/api/entries?student_id=${encodeURIComponent(studentId)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
 
-      if (error) {
-        throw new Error(`Failed to delete student entries: ${error.message}`)
+      if (res.ok) {
+        const result = await res.json();
+        console.log(`✅ Deleted ${result.deletedCount || 0} entries via API for student ${studentId}`);
+        return result.deletedCount || 0;
+      } else {
+        throw new Error("API delete failed");
       }
+    } catch (apiError) {
+      console.warn("⚠️ API not available, using fallback methods");
 
-      return data?.length || 0
-    } else {
-      // Use localStorage
-      const entries = this.loadEntriesFromLocal()
-      const studentEntries = entries.filter((e) => e.student_id === studentId)
-      const filteredEntries = entries.filter((e) => e.student_id !== studentId)
-      this.saveEntriesToLocal(filteredEntries)
-      return studentEntries.length
+      if (this.isSupabaseAvailable() && supabase) {
+        // Use Supabase
+        const { data, error } = await supabase
+          .from("entry_logs")
+          .delete()
+          .eq("student_id", studentId)
+          .select("id")
+
+        if (error) {
+          throw new Error(`Failed to delete student entries: ${error.message}`)
+        }
+
+        return data?.length || 0
+      } else {
+        // Use localStorage
+        const entries = this.loadEntriesFromLocal()
+        const studentEntries = entries.filter((e) => e.student_id === studentId)
+        const filteredEntries = entries.filter((e) => e.student_id !== studentId)
+        this.saveEntriesToLocal(filteredEntries)
+        return studentEntries.length
+      }
     }
   }
 

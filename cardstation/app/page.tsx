@@ -149,30 +149,32 @@ export default function IDCardStation() {
     }
   }
 
-  // Enhanced Application Number validation with better error handling
+  // Enhanced Enrollment Number validation with better error handling
   const validateApplicationNumber = async (
     appNumber: string,
   ): Promise<{ isValid: boolean; student: Student | null; error?: string; errorType?: string }> => {
     try {
-      // Clean the application number
+      console.log("🔍 Validating Enrollment Number:", appNumber)
+
+      // Clean the enrollment number
       const cleanAppNumber = appNumber.trim().toUpperCase()
 
       if (!cleanAppNumber) {
         return {
           isValid: false,
           student: null,
-          error: "Empty Application Number. Please scan a valid QR code.",
+          error: "Empty Enrollment Number. Please scan a valid QR code.",
           errorType: "EMPTY_QR"
         }
       }
 
-      // Validate application number format (should start with APP followed by year and 4 digits)
+      // Validate enrollment number format (should start with APP followed by year and 4 digits)
       const appNumberPattern = /^APP\d{8}$/
       if (!appNumberPattern.test(cleanAppNumber)) {
         return {
           isValid: false,
           student: null,
-          error: `Invalid QR Code Format: "${cleanAppNumber}" is not a valid application number format. Expected format: APP followed by 8 digits.`,
+          error: `Invalid QR Code Format: "${cleanAppNumber}" is not a valid enrollment number format. Expected format: APP followed by 8 digits.`,
           errorType: "INVALID_FORMAT"
         }
       }
@@ -191,15 +193,17 @@ export default function IDCardStation() {
         }
       }
 
-      // Find student by application number in admin database
-      setQrScanStatus("Checking application number against admin database...")
+      console.log(`🔍 Searching for student with enrollment number: ${cleanAppNumber}`)
+
+      // Find student by enrollment number in admin database
+      setQrScanStatus("Checking enrollment number against admin database...")
       const student = await dbStore.getStudentByAppNumber(cleanAppNumber)
 
       if (!student) {
         return {
           isValid: false,
           student: null,
-          error: `Application Number Not Found: "${cleanAppNumber}" is not registered in the admin database. Please verify the QR code or contact admin for registration.`,
+          error: `Enrollment Number Not Found: "${cleanAppNumber}" is not registered in the admin database. Please verify the QR code or contact admin for registration.`,
           errorType: "NOT_FOUND_IN_DATABASE"
         }
       }
@@ -214,15 +218,15 @@ export default function IDCardStation() {
         }
       }
 
-      // Success - Application number is valid and student found in admin database
-      console.log(`✅ Application Number Validated: ${student.name} (${cleanAppNumber})`)
+      // Success - Enrollment number is valid and student found in admin database
+      console.log(`✅ Enrollment Number Validated: ${student.name} (${cleanAppNumber})`)
       return { isValid: true, student, errorType: "SUCCESS" }
     } catch (error) {
-      console.error("Application number validation error:", error)
+      console.error("Enrollment number validation error:", error)
       return {
         isValid: false,
         student: null,
-        error: "Database Connection Error: Unable to validate application number against admin database. Please check connection and try again.",
+        error: "Database Connection Error: Unable to validate enrollment number against admin database. Please check connection and try again.",
         errorType: "DATABASE_ERROR"
       }
     }
@@ -327,17 +331,17 @@ export default function IDCardStation() {
       if (error instanceof Error) {
         if (error.name === "NotAllowedError") {
           alert(
-            "Camera Permission Denied!\n\nTo fix this:\n1. Click the camera icon in your browser's address bar\n2. Allow camera access\n3. Refresh the page and try again\n\nOr use Manual Application Number Input below.",
+            "Camera Permission Denied!\n\nTo fix this:\n1. Click the camera icon in your browser's address bar\n2. Allow camera access\n3. Refresh the page and try again\n\nOr use Manual Enrollment Number Input below.",
           )
         } else if (error.name === "NotFoundError") {
           alert(
-            "No Camera Found!\n\nNo camera detected on this device.\nYou can use Manual Application Number Input below.",
+            "No Camera Found!\n\nNo camera detected on this device.\nYou can use Manual Enrollment Number Input below.",
           )
         } else {
-          alert("Camera Access Failed!\n\nUnable to access camera.\nYou can use Manual Application Number Input below.")
+          alert("Camera Access Failed!\n\nUnable to access camera.\nYou can use Manual Enrollment Number Input below.")
         }
       } else {
-        alert("Camera Access Failed!\n\nUnable to access camera.\nYou can use Manual Application Number Input below.")
+        alert("Camera Access Failed!\n\nUnable to access camera.\nYou can use Manual Enrollment Number Input below.")
       }
     }
   }
@@ -353,12 +357,12 @@ export default function IDCardStation() {
         return
       }
 
-      // Try to detect QR code (Application Number)
+      // Try to detect QR code (Enrollment Number)
       const detectedAppNumber = detectQRCode()
 
       if (detectedAppNumber) {
         console.log("QR Code detected:", detectedAppNumber)
-        setQrScanStatus("✅ QR Code detected! Validating Application Number...")
+        setQrScanStatus("✅ QR Code detected! Validating Enrollment Number...")
         processApplicationNumber(detectedAppNumber)
       } else {
         setQrScanStatus(`🔍 Scanning for QR code... (${availableStudents.length} students in database)`)
@@ -384,14 +388,14 @@ export default function IDCardStation() {
     setQrScanStatus("")
   }
 
-  // Process Manual Application Number Input
+  // Process Manual Enrollment Number Input
   const handleManualQRInput = async () => {
     if (!manualQRData.trim()) {
-      alert("Please enter Application Number")
+      alert("Please enter Enrollment Number")
       return
     }
 
-    setQrScanStatus("Processing Application Number...")
+    setQrScanStatus("Processing Enrollment Number...")
 
     // Ensure data is loaded
     await loadData()
@@ -400,10 +404,10 @@ export default function IDCardStation() {
     setManualQRData("")
   }
 
-  // Enhanced Process Application Number with better error handling and try again
+  // Enhanced Process Enrollment Number with better error handling and try again
   const processApplicationNumber = async (appNumber: string) => {
-    console.log("Processing Application Number:", appNumber)
-    setQrScanStatus("Validating Application Number against admin database...")
+    console.log("Processing Enrollment Number:", appNumber)
+    setQrScanStatus("Validating Enrollment Number against admin database...")
 
     // Ensure we have the latest student data from admin database
     await loadData()
@@ -411,7 +415,7 @@ export default function IDCardStation() {
     const validation = await validateApplicationNumber(appNumber)
 
     if (!validation.isValid) {
-      setQrScanStatus("❌ Application Number validation failed!")
+      setQrScanStatus("❌ Enrollment Number validation failed!")
 
       // Show specific error message based on error type
       let errorMessage = `❌ QR Code Validation Failed!\n\n${validation.error}\n\n`
@@ -425,7 +429,7 @@ export default function IDCardStation() {
           tryAgainMessage = "🔄 Please try:\n• Scanning the correct student QR code\n• Ensuring QR code is not damaged\n• Getting a new QR code from admin"
           break
         case "NOT_FOUND_IN_DATABASE":
-          tryAgainMessage = "🔄 Please try:\n• Verifying the application number\n• Contacting admin for registration\n• Checking if student is registered in system"
+          tryAgainMessage = "🔄 Please try:\n• Verifying the Enrollment Number\n• Contacting admin for registration\n• Checking if student is registered in system"
           break
         case "NO_PHOTO":
           tryAgainMessage = "🔄 Please contact admin to:\n• Add student photo to database\n• Complete student registration\n• Enable face verification"
@@ -460,10 +464,10 @@ export default function IDCardStation() {
       setShowTryAgain(false)
       setCameraActive(false)
       setFaceMatchScore(null)
-      setQrScanStatus("✅ Application Number validated successfully! Auto-starting face verification...")
+      setQrScanStatus("✅ Enrollment Number validated successfully! Auto-starting face verification...")
       stopQRScanner()
 
-      console.log(`✅ Application Number Validated: ${validation.student.name}`)
+      console.log(`✅ Enrollment Number Validated: ${validation.student.name}`)
       console.log(`Student Details: ${validation.student.class}, ${validation.student.department}`)
       console.log(`Student Image Available: ${validation.student.image_url ? 'Yes' : 'No'}`)
 
@@ -616,7 +620,7 @@ export default function IDCardStation() {
   // Enhanced live face verification with anti-spoofing
   const verifyFace = async () => {
     if (!currentStudent || !qrValidated) {
-      alert("Please scan a valid Application Number first")
+      alert("Please scan a valid Enrollment Number first")
       return
     }
 
@@ -1001,7 +1005,7 @@ export default function IDCardStation() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <QrCode className="h-5 w-5" />
-                  Step 1: Application Number Scanner
+                  Step 1: Enrollment Number Scanner
                   {qrValidated && (
                     <Badge variant="secondary" className="ml-2">
                       ✅ Validated
@@ -1032,7 +1036,7 @@ export default function IDCardStation() {
                                 <div className="text-center text-white">
                                   <QrCode className="h-16 w-16 mx-auto mb-3 text-green-400" />
                                   <p className="text-lg font-semibold">Point Camera Here</p>
-                                  <p className="text-sm">QR Code with Application Number</p>
+                                  <p className="text-sm">QR Code with Enrollment Number</p>
                                   <div className="mt-2 px-3 py-1 bg-green-500/80 rounded-full text-xs">
                                     Auto-scanning active
                                   </div>
@@ -1091,15 +1095,15 @@ export default function IDCardStation() {
 
                     <Separator />
 
-                    {/* Manual Application Number Input */}
+                    {/* Manual Enrollment Number Input */}
                     <div className="space-y-2">
-                      <Label htmlFor="manualQR">Manual Application Number Input</Label>
+                      <Label htmlFor="manualQR">Manual Enrollment Number Input</Label>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <Input
                           id="manualQR"
                           value={manualQRData}
                           onChange={(e) => setManualQRData(e.target.value)}
-                          placeholder="Enter Application Number"
+                          placeholder="Enter Enrollment Number"
                           className="flex-1"
                         />
                         <Button
@@ -1111,17 +1115,17 @@ export default function IDCardStation() {
                           Validate
                         </Button>
                       </div>
-                      <p className="text-xs text-gray-500">Enter Application Number from Student App</p>
+                      <p className="text-xs text-gray-500">Enter Enrollment Number from Student App</p>
                     </div>
 
-                    {/* Application Number Requirements */}
+                    {/* Enrollment Number Requirements */}
                     <Alert className="border-blue-200 bg-blue-50">
                       <AlertTriangle className="h-4 w-4 text-blue-600" />
                       <AlertDescription className="text-blue-800">
                         <strong>Connected to Same Database:</strong>
                         <ul className="list-disc list-inside text-xs mt-1 space-y-1">
-                          <li>QR code contains student's Application Number</li>
-                          <li>Scanner reads Application Number from QR code</li>
+                          <li>QR code contains student's Enrollment Number</li>
+                          <li>Scanner reads Enrollment Number from QR code</li>
                           <li>System finds student details from same admin database</li>
                           <li>Face verification with stored student photo</li>
                         </ul>
@@ -1340,7 +1344,7 @@ export default function IDCardStation() {
                         <Camera className="h-12 w-12 mx-auto mb-2 opacity-50" />
                         <p>Face Camera Ready</p>
                         <p className="text-sm">
-                          {qrValidated ? "Click to start face verification" : "Scan Application Number first"}
+                          {qrValidated ? "Click to start face verification" : "Scan Enrollment Number first"}
                         </p>
                       </div>
                     </div>
@@ -1437,7 +1441,7 @@ export default function IDCardStation() {
                     <Alert className="border-yellow-200 bg-yellow-50">
                       <AlertTriangle className="h-4 w-4 text-yellow-600" />
                       <AlertDescription className="text-yellow-800">
-                        Please scan and validate an Application Number first before face verification.
+                        Please scan and validate an Enrollment Number first before face verification.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -1473,13 +1477,13 @@ export default function IDCardStation() {
               </Card>
             )}
 
-            {/* Today's Activity Stats - 3 Card Layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            {/* Today's Activity Stats - 2 Card Layout */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {/* Total Entries Card */}
               <Card className="bg-green-50 border-green-200">
                 <CardContent className="p-4 sm:p-6 text-center">
                   <div className="text-3xl sm:text-4xl font-bold text-green-600 mb-2">
-                    {todayEntries.filter(e => e.status === 'entry').length}
+                    {todayEntries.length}
                   </div>
                   <div className="text-sm sm:text-base font-medium text-green-700">
                     Total Entries
@@ -1494,7 +1498,7 @@ export default function IDCardStation() {
               <Card className="bg-red-50 border-red-200">
                 <CardContent className="p-4 sm:p-6 text-center">
                   <div className="text-3xl sm:text-4xl font-bold text-red-600 mb-2">
-                    {todayEntries.filter(e => e.status === 'exit').length}
+                    {todayEntries.filter(e => e.exitTime || e.exit_time).length}
                   </div>
                   <div className="text-sm sm:text-base font-medium text-red-700">
                     Total Exits
@@ -1505,20 +1509,7 @@ export default function IDCardStation() {
                 </CardContent>
               </Card>
 
-              {/* Total Activity Card */}
-              <Card className="bg-blue-50 border-blue-200">
-                <CardContent className="p-4 sm:p-6 text-center">
-                  <div className="text-3xl sm:text-4xl font-bold text-blue-600 mb-2">
-                    {todayEntries.length}
-                  </div>
-                  <div className="text-sm sm:text-base font-medium text-blue-700">
-                    Total Activity
-                  </div>
-                  <div className="text-xs text-blue-500 mt-1">
-                    Today
-                  </div>
-                </CardContent>
-              </Card>
+
             </div>
 
             {/* View History Button */}
@@ -1576,18 +1567,20 @@ export default function IDCardStation() {
               </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-4 text-center">
+                {console.log("🔍 Today's Entries Debug:", {
+                  totalEntries: todayEntries.length,
+                  entriesWithExit: todayEntries.filter(e => e.exitTime || e.exit_time).length,
+                  sampleEntry: todayEntries[0],
+                  allEntries: todayEntries
+                })}
+                <div className="grid grid-cols-2 gap-4 text-center">
                   <div className="bg-green-50 p-4 rounded-lg">
-                    <p className="text-3xl font-bold text-green-600">{todayEntries.filter(e => e.status === 'entry').length}</p>
+                    <p className="text-3xl font-bold text-green-600">{todayEntries.length}</p>
                     <p className="text-sm text-green-700">Total Entries</p>
                   </div>
                   <div className="bg-red-50 p-4 rounded-lg">
-                    <p className="text-3xl font-bold text-red-600">{todayEntries.filter(e => e.status === 'exit').length}</p>
+                    <p className="text-3xl font-bold text-red-600">{todayEntries.filter(e => e.exitTime || e.exit_time).length}</p>
                     <p className="text-sm text-red-700">Total Exits</p>
-                  </div>
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <p className="text-3xl font-bold text-blue-600">{todayEntries.length}</p>
-                    <p className="text-sm text-blue-700">Total Activity</p>
                   </div>
                 </div>
 
@@ -1605,7 +1598,7 @@ export default function IDCardStation() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <span className="text-2xl">
-                                {entry.status === 'entry' ? '🟢' : '🔴'}
+                                {entry.exitTime || entry.exit_time ? '🔴' : '🟢'}
                               </span>
                               <div>
                                 <p className="font-semibold text-lg">{entry.student_name}</p>
@@ -1637,14 +1630,14 @@ export default function IDCardStation() {
                               </span>
                               <span className="flex items-center gap-1">
                                 <CheckCircle className="h-3 w-3" />
-                                {entry.status === 'entry' ? 'Entry' : 'Exit'} Recorded
+                                {entry.exitTime || entry.exit_time ? 'Exit' : 'Entry'} Recorded
                               </span>
                             </div>
                           </div>
 
                           <div className="text-right">
-                            <Badge variant={entry.status === 'entry' ? 'default' : 'secondary'} className="mb-2">
-                              {entry.status === 'entry' ? 'ENTRY' : 'EXIT'}
+                            <Badge variant={entry.exitTime || entry.exit_time ? 'secondary' : 'default'} className="mb-2">
+                              {entry.exitTime || entry.exit_time ? 'EXIT' : 'ENTRY'}
                             </Badge>
                             <p className="text-xs text-gray-500">
                               {entry.verified ? '✅ Verified' : '⚠️ Pending'}

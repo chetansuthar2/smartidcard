@@ -55,10 +55,14 @@ export default function StudentApp() {
     try {
       console.log(`🔍 Fetching entries for student: ${currentStudent.name} (${currentStudent.application_number})`)
 
-      // Try to get all entries and filter for this student
+      // Try to get entries with shorter timeout and better error handling
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+      const timeoutId = setTimeout(() => {
+        console.log("⏰ Request timeout after 5 seconds")
+        controller.abort()
+      }, 5000) // Reduced to 5 second timeout
 
+      console.log("📡 Making API request to /api/entries...")
       const entriesRes = await fetch('/api/entries', {
         method: 'GET',
         headers: {
@@ -68,6 +72,7 @@ export default function StudentApp() {
       })
 
       clearTimeout(timeoutId)
+      console.log("✅ API request completed, status:", entriesRes.status)
 
       if (entriesRes.ok) {
         const allEntries = await entriesRes.json()
@@ -92,6 +97,16 @@ export default function StudentApp() {
         setStudentEntries(studentEntries)
         console.log(`✅ Found ${studentEntries.length} entries for ${currentStudent.name}:`, studentEntries)
 
+        // Cache successful results for offline access
+        if (studentEntries.length > 0) {
+          try {
+            localStorage.setItem(`student_entries_${currentStudent.application_number}`, JSON.stringify(studentEntries))
+            console.log("💾 Cached entries for offline access")
+          } catch (cacheError) {
+            console.warn("⚠️ Failed to cache entries:", cacheError)
+          }
+        }
+
         // Debug: Check entry data structure
         if (studentEntries.length > 0) {
           console.log("📊 Sample entry structure:", studentEntries[0])
@@ -105,18 +120,35 @@ export default function StudentApp() {
     } catch (error) {
       console.error("❌ Error refreshing entries:", error)
 
-      // Handle specific error types
+      // Handle specific error types with user-friendly messages
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
           console.error("❌ Request timeout - API took too long to respond")
+          console.log("💡 This might be due to slow database connection or server issues")
         } else if (error.message.includes('Failed to fetch')) {
-          console.error("❌ Network error - Check if server is running on port 3001")
+          console.error("❌ Network error - Check if server is running")
+          console.log("💡 Make sure the smartidcard server is running on the correct port")
         } else {
           console.error("❌ Unexpected error:", error.message)
         }
       }
 
-      // Set empty entries array as fallback
+      // Try to load from localStorage as fallback
+      console.log("🔄 Attempting to load cached entries...")
+      try {
+        const cachedEntries = localStorage.getItem(`student_entries_${currentStudent.application_number}`)
+        if (cachedEntries) {
+          const parsedEntries = JSON.parse(cachedEntries)
+          setStudentEntries(parsedEntries)
+          console.log("✅ Loaded cached entries:", parsedEntries.length)
+          return
+        }
+      } catch (cacheError) {
+        console.error("❌ Failed to load cached entries:", cacheError)
+      }
+
+      // Set empty entries array as final fallback
+      console.log("📝 No cached data available, showing empty state")
       setStudentEntries([])
     }
   }
@@ -184,6 +216,9 @@ export default function StudentApp() {
 
   const generateSimpleQRCode = () => {
     if (!currentStudent) return ""
+
+    // For display purposes, just show enrollment number
+    // But for scanning validation, we'll use structured data
     return currentStudent.application_number
   }
 
@@ -328,17 +363,83 @@ export default function StudentApp() {
             
             {activeSection === "idCard" && (
               <CardContent className="pt-0 px-4 pb-4">
-                <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-5 text-white">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h2 className="text-xl font-bold">College Identity Card</h2>
-                      <p className="text-blue-100 text-sm">Official Identification Document</p>
+                <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-5 text-white relative overflow-hidden">
+
+
+                  <div className="relative z-10">
+                    {/* Mobile-first responsive header */}
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        {/* KPGU Logo - better visibility */}
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-lg p-2 flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <div className="w-full h-full flex items-center justify-center">
+                            {/* KPGU Logo SVG - Always visible */}
+                            <svg width="100%" height="100%" viewBox="0 0 100 100" className="fill-current text-red-600">
+                              <g transform="translate(50,50)">
+                                {/* Outer circular text */}
+                                <path id="topCircle" d="M -35,0 A 35,35 0 0,1 35,0" fill="none"/>
+                                <text fontFamily="Arial, sans-serif" fontSize="3.5" fontWeight="bold" fill="currentColor">
+                                  <textPath href="#topCircle" startOffset="5%">DRS. KIRAN &amp; PALLAVI PATEL GLOBAL</textPath>
+                                </text>
+
+                                <path id="bottomCircle" d="M 35,0 A 35,35 0 0,1 -35,0" fill="none"/>
+                                <text fontFamily="Arial, sans-serif" fontSize="3.5" fontWeight="bold" fill="currentColor">
+                                  <textPath href="#bottomCircle" startOffset="25%">UNIVERSITY</textPath>
+                                </text>
+
+                                {/* Left Peacock */}
+                                <g transform="translate(-15,-7.5) scale(0.15)">
+                                  <path d="M-15,-35 Q-25,-45 -35,-40 Q-30,-30 -20,-25 Q-10,-20 -5,-10 Q0,0 5,10 Q10,20 15,30 Q20,35 15,25 Q10,15 5,5 Q0,-5 -5,-15 Q-10,-25 -15,-35 Z" fill="currentColor"/>
+                                  <circle cx="-20" cy="-30" r="1.5" fill="currentColor"/>
+                                </g>
+
+                                {/* Right Peacock */}
+                                <g transform="translate(15,-7.5) scale(0.15) scale(-1,1)">
+                                  <path d="M-15,-35 Q-25,-45 -35,-40 Q-30,-30 -20,-25 Q-10,-20 -5,-10 Q0,0 5,10 Q10,20 15,30 Q20,35 15,25 Q10,15 5,5 Q0,-5 -5,-15 Q-10,-25 -15,-35 Z" fill="currentColor"/>
+                                  <circle cx="-20" cy="-30" r="1.5" fill="currentColor"/>
+                                </g>
+
+                                {/* Central Shield */}
+                                <path d="M-8.75,-12.5 L8.75,-12.5 L10,-7.5 L8.75,12.5 L-8.75,12.5 L-10,-7.5 Z" fill="none" stroke="currentColor" strokeWidth="0.6"/>
+
+                                {/* Lotus/Mandala design at top */}
+                                <g transform="translate(0,-8.75)">
+                                  <circle cx="0" cy="0" r="3" fill="none" stroke="currentColor" strokeWidth="0.4"/>
+                                  <path d="M-2,-2 L0,-4 L2,-2 L2,2 L0,4 L-2,2 Z" fill="none" stroke="currentColor" strokeWidth="0.25"/>
+                                </g>
+
+                                {/* Graduation cap */}
+                                <g transform="translate(0,-1.25)">
+                                  <path d="M-3,-0.75 L3,-0.75 L2.5,0.5 L-2.5,0.5 Z" fill="currentColor"/>
+                                  <circle cx="0" cy="-0.75" r="0.4" fill="currentColor"/>
+                                </g>
+
+                                {/* Globe */}
+                                <circle cx="0" cy="3.75" r="2.5" fill="none" stroke="currentColor" strokeWidth="0.4"/>
+                                <path d="M-2.5,3.75 Q0,2.5 2.5,3.75" fill="none" stroke="currentColor" strokeWidth="0.25"/>
+                                <path d="M-1.5,1.75 Q0,5 1.5,1.75" fill="none" stroke="currentColor" strokeWidth="0.25"/>
+
+                                {/* KPGU Banner */}
+                                <path d="M-6.25,8.75 L-5,7.5 L5,7.5 L6.25,8.75 L5,11.25 L-5,11.25 Z" fill="currentColor"/>
+                                <text x="0" y="10" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="2.5" fontWeight="bold" fill="white">KPGU</text>
+
+                                {/* VADODARA text */}
+                                <text x="0" y="16.25" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="3" fontWeight="bold" fill="currentColor">VADODARA</text>
+                              </g>
+                            </svg>
+                          </div>
+
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h2 className="text-sm sm:text-lg font-bold leading-tight">Drs. Kiran & Pallavi Patel Global University</h2>
+                          <p className="text-blue-100 text-xs sm:text-sm">Official Identification Document</p>
+                        </div>
+                      </div>
+                      <div className="text-right sm:text-right self-end sm:self-start">
+                        <div className="text-xs text-blue-200">Valid Until</div>
+                        <div className="font-bold text-sm">31/12/2025</div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs text-blue-200">Valid Until</div>
-                      <div className="font-bold">31/12/2025</div>
-                    </div>
-                  </div>
                   
                   <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1">
@@ -355,7 +456,7 @@ export default function StudentApp() {
                           <h1 className="text-lg font-bold">{currentStudent?.name}</h1>
                           <div className="mt-2 space-y-1">
                             <div>
-                              <div className="text-xs text-blue-200">Application Number</div>
+                              <div className="text-xs text-blue-200">Enrollment Number</div>
                               <div className="font-mono font-bold">{currentStudent?.application_number}</div>
                             </div>
                             <div>
@@ -365,10 +466,10 @@ export default function StudentApp() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                         <div>
-                          <div className="text-xs text-blue-200">Class</div>
+                          <div className="text-xs text-blue-200">Semester</div>
                           <div className="font-bold">{currentStudent?.class}</div>
                         </div>
                         <div>
@@ -376,6 +477,13 @@ export default function StudentApp() {
                           <div className="font-bold">{currentStudent?.phone}</div>
                         </div>
                       </div>
+
+                      {currentStudent?.address && (
+                        <div className="mt-2">
+                          <div className="text-xs text-blue-200">Address</div>
+                          <div className="font-bold text-sm">{currentStudent?.address}</div>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex flex-col items-center">
@@ -410,8 +518,9 @@ export default function StudentApp() {
                       </Button>
                     </div>
                     <p className="text-xs text-blue-200 mt-1 text-center">
-                      Copy application number for manual entry at station
+                      Copy enrollment number for manual entry at station
                     </p>
+                  </div>
                   </div>
                 </div>
               </CardContent>
@@ -471,12 +580,16 @@ export default function StudentApp() {
                         <Label className="text-gray-500 text-sm">Schedule</Label>
                         <p className="font-medium">{currentStudent?.schedule || "Not assigned"}</p>
                       </div>
+                      <div className="col-span-1 sm:col-span-2">
+                        <Label className="text-gray-500 text-sm">Address</Label>
+                        <p className="font-medium">{currentStudent?.address || "Not provided"}</p>
+                      </div>
                     </div>
                     
                     <Separator />
                     
                     <div>
-                      <Label className="text-gray-500 text-sm">Application Number</Label>
+                      <Label className="text-gray-500 text-sm">Enrollment Number</Label>
                       <Badge variant="outline" className="font-mono mt-1">
                         {currentStudent?.application_number}
                       </Badge>
@@ -645,9 +758,9 @@ export default function StudentApp() {
                   Manual Input Option
                 </h3>
                 <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>Copy your Application Number</li>
+                  <li>Copy your Enrollment Number</li>
                   <li>Go to station's "Manual Entry" section</li>
-                  <li>Paste your Application Number</li>
+                  <li>Paste your Enrollment Number</li>
                   <li>Click "Validate" to retrieve details</li>
                   <li>Continue with face verification</li>
                 </ul>

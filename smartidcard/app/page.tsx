@@ -65,7 +65,7 @@ export default function LoginPage() {
     setStudentLoading(true)
 
     if (!studentCredentials.applicationNumber || !studentCredentials.phone) {
-      setStudentError("Please fill both Application Number and Phone Number")
+      setStudentError("Please fill both Enrollment Number and Phone Number")
       setStudentLoading(false)
       return
     }
@@ -85,14 +85,11 @@ export default function LoginPage() {
         }
         router.push("/student")
       } else {
-        const studentByApp = await dbStore.getStudentByAppNumber(studentCredentials.applicationNumber)
-        if (studentByApp) {
-          setStudentError(`Application Number found but phone number doesn't match. Expected: ${studentByApp.phone}`)
-        } else {
-          setStudentError(
-            `Application Number "${studentCredentials.applicationNumber}" not found. Please check with admin.`,
-          )
-        }
+        // Security: Don't reveal if enrollment number exists or not
+        // Always show generic error message
+        setStudentError(
+          "Invalid credentials. Please check your Enrollment Number and Phone Number and try again."
+        )
       }
     } catch (error) {
       setStudentError("Login failed. Please try again.")
@@ -190,16 +187,7 @@ export default function LoginPage() {
                   </Button>
                 </div>
 
-                {/* Admin Demo Credentials */}
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <p className="text-sm font-medium text-blue-700 mb-1">Demo Credentials:</p>
-                  <p className="text-xs text-blue-600">
-                    Username: <strong>admin</strong>
-                  </p>
-                  <p className="text-xs text-blue-600">
-                    Password: <strong>admin123</strong>
-                  </p>
-                </div>
+
               </TabsContent>
 
               {/* Student Login Tab */}
@@ -212,7 +200,7 @@ export default function LoginPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="student-app">Application Number</Label>
+                    <Label htmlFor="student-app">Enrollment Number</Label>
                     <Input
                       id="student-app"
                       value={studentCredentials.applicationNumber}
@@ -257,7 +245,7 @@ export default function LoginPage() {
                 {/* Student Login Info */}
                 <div className="bg-green-50 p-3 rounded-lg border border-green-200">
                   <p className="text-sm font-medium text-green-700 mb-1">Login Information:</p>
-                  <p className="text-xs text-green-600">• Get Application Number from Admin</p>
+                  <p className="text-xs text-green-600">• Get Enrollment Number from Admin</p>
                   <p className="text-xs text-green-600">• Use your registered phone number</p>
                   <p className="text-xs text-green-600">• Both details must match exactly</p>
                 </div>
@@ -295,34 +283,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        {/* Quick Start Guide */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Quick Start Guide</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-start space-x-3">
-                <div className="bg-blue-100 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold text-blue-600">
-                  1
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Admin Setup</p>
-                  <p className="text-xs text-gray-600">Login as admin → Add students → Generate credentials</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="bg-green-100 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold text-green-600">
-                  2
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Student Access</p>
-                  <p className="text-xs text-gray-600">Login with App Number + Phone → View digital ID card</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
       </div>
     </div>
   )

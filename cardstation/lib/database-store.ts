@@ -3,6 +3,7 @@
 import { supabase } from "./supabase"
 import type { Database } from "./supabase"
 import clientPromise from "./mongodb"
+import { apiClient } from "./api-client"
 
 type Student = Database["public"]["Tables"]["students"]["Row"]
 type StudentInsert = Database["public"]["Tables"]["students"]["Insert"]
@@ -27,7 +28,7 @@ const ENTRIES_KEY = "smart_id_entries"
 
 class DatabaseStore {
   private isSupabaseAvailable(): boolean {
-    return supabase !== null && typeof window !== "undefined"
+    return false // Force use API client for cardstation
   }
 
   private isLocalStorageAvailable(): boolean {
@@ -121,21 +122,22 @@ class DatabaseStore {
 
   async getStudents(): Promise<StudentWithDates[]> {
     try {
-      // Try API first
-      const res = await fetch("/api/students");
+      // Try smartidcard API first (deployed or local)
+      const apiUrl = process.env.NEXT_PUBLIC_SMARTIDCARD_API_URL || "http://localhost:3001";
+      const res = await fetch(`${apiUrl}/api/students`);
       if (res.ok) {
         const data = await res.json();
-        console.log("✅ Students loaded from API:", data.length);
+        console.log("✅ Students loaded from smartidcard API:", data.length);
         return data.map((s: any) => ({
           ...s,
           createdAt: new Date(s.createdAt || s.created_at || new Date()),
           updatedAt: new Date(s.updatedAt || s.updated_at || new Date()),
         }));
       } else {
-        throw new Error("API failed");
+        throw new Error("Smartidcard API failed");
       }
     } catch (error) {
-      console.warn("⚠️ Students API not available, using localStorage fallback");
+      console.warn("⚠️ Smartidcard API not available, using localStorage fallback");
       // Fallback to localStorage
       const localStudents = this.loadStudentsFromLocal();
       console.log("✅ Students loaded from localStorage:", localStudents.length);
@@ -145,23 +147,24 @@ class DatabaseStore {
 
   async getStudentByAppNumber(appNumber: string): Promise<StudentWithDates | null> {
     try {
-      // Try API first
-      const res = await fetch(`/api/students?application_number=${encodeURIComponent(appNumber)}`);
+      // Try smartidcard API first (deployed or local)
+      const apiUrl = process.env.NEXT_PUBLIC_SMARTIDCARD_API_URL || "http://localhost:3001";
+      const res = await fetch(`${apiUrl}/api/students?application_number=${encodeURIComponent(appNumber)}`);
       if (res.ok) {
         const data = await res.json();
         if (!data || data.length === 0) return null;
         const s = data[0];
-        console.log("✅ Student found via API:", s.name);
+        console.log("✅ Student found via smartidcard API:", s.name);
         return {
           ...s,
           createdAt: new Date(s.createdAt || s.created_at || new Date()),
           updatedAt: new Date(s.updatedAt || s.updated_at || new Date()),
         };
       } else {
-        throw new Error("API failed");
+        throw new Error("Smartidcard API failed");
       }
     } catch (error) {
-      console.warn("⚠️ Student API not available, using localStorage fallback");
+      console.warn("⚠️ Smartidcard API not available, using localStorage fallback");
       // Fallback to localStorage
       const localStudents = this.loadStudentsFromLocal();
       const student = localStudents.find(s => s.application_number === appNumber);
@@ -229,8 +232,9 @@ class DatabaseStore {
       console.log("Sending entry data to API:", entryData);
 
       try {
-        // Try API first
-        const res = await fetch('/api/entries', {
+        // Try smartidcard API first (deployed or local)
+        const apiUrl = process.env.NEXT_PUBLIC_SMARTIDCARD_API_URL || "http://localhost:3001";
+        const res = await fetch(`${apiUrl}/api/entries`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
