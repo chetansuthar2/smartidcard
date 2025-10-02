@@ -119,10 +119,10 @@ export default function AdminLogin() {
           </CardHeader>
           <CardContent className="text-sm space-y-2">
             <p>
-              <strong>Username:</strong> admin
+              <strong>Username:</strong> 
             </p>
             <p>
-              <strong>Password:</strong> admin123
+              <strong>Password:</strong>
             </p>
             <p className="text-gray-600 mt-2">Use these credentials to access the admin panel</p>
 
